@@ -18,6 +18,35 @@ import { cn } from './lib/utils';
 
 // --- Constants & Types ---
 
+interface Product {
+  id: number;
+  name: string;
+  category: string;
+  price: number;
+  image: string;
+  weight: string;
+  description: string;
+}
+
+interface Order {
+  id: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  items: string; // JSON string
+  total: number;
+  status: string;
+  created_at: string;
+}
+
+interface CartItem extends Product {
+  quantity: number;
+}
+
 const CATEGORIES = [
   { id: 'cordoes', name: 'Cordões', image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?q=80&w=800&auto=format&fit=crop', description: 'Ouro 18k e Prata 925' },
   { id: 'pulseiras', name: 'Pulseiras', image: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?q=80&w=800&auto=format&fit=crop', description: 'Design exclusivo e robusto' },
@@ -25,16 +54,278 @@ const CATEGORIES = [
   { id: 'aliancas', name: 'Alianças', image: 'https://images.unsplash.com/photo-1605100804763-247f67b3557e?q=80&w=800&auto=format&fit=crop', description: 'O símbolo do seu compromisso' },
 ];
 
-const FEATURED_PRODUCTS = [
-  { id: 1, name: 'Cordão Grumet Ouro 18k', category: 'Cordões', price: 'Sob Consulta', image: 'https://images.unsplash.com/photo-1611085583191-a3b130944ac5?q=80&w=600&auto=format&fit=crop' },
-  { id: 2, name: 'Pulseira Riviera Prata 925', category: 'Pulseiras', price: 'Sob Consulta', image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=600&auto=format&fit=crop' },
-  { id: 3, name: 'Brinco Argola Cravejada', category: 'Brincos', price: 'Sob Consulta', image: 'https://images.unsplash.com/photo-1635767791024-3d5705ee45d7?q=80&w=600&auto=format&fit=crop' },
-  { id: 4, name: 'Aliança de Casamento Classic', category: 'Alianças', price: 'Sob Consulta', image: 'https://images.unsplash.com/photo-1589128777073-263566ae5e4d?q=80&w=600&auto=format&fit=crop' },
-];
+const CartDrawer = ({ isOpen, onClose, items, total, onRemove }: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  items: CartItem[], 
+  total: number,
+  onRemove: (id: number) => void
+}) => {
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [formData, setFormData] = useState({
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip_code: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          items,
+          total
+        })
+      });
+      if (res.ok) {
+        alert("Pedido realizado com sucesso! Entraremos em contato.");
+        onClose();
+        window.location.reload(); // Simple way to clear cart and refresh
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-paper z-[70] shadow-2xl p-8 flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-2xl font-serif">Seu Carrinho</h3>
+              <button onClick={onClose} className="p-2 hover:bg-ink/5 rounded-full transition-colors"><X /></button>
+            </div>
+
+            {!isCheckingOut ? (
+              <>
+                <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                  {items.length === 0 ? (
+                    <div className="text-center py-12 text-ink/40 italic">Seu carrinho está vazio.</div>
+                  ) : (
+                    items.map(item => (
+                      <div key={item.id} className="flex gap-4 items-center">
+                        <img src={item.image} className="w-20 h-20 object-cover rounded-lg" />
+                        <div className="flex-1">
+                          <h4 className="font-serif text-lg">{item.name}</h4>
+                          <p className="text-sm text-ink/60">{item.quantity}x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price)}</p>
+                        </div>
+                        <button onClick={() => onRemove(item.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"><X size={16} /></button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-8 pt-8 border-t border-ink/10">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-lg font-serif">Total</span>
+                    <span className="text-2xl font-bold text-gold-dark">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                  </div>
+                  <button 
+                    disabled={items.length === 0}
+                    onClick={() => setIsCheckingOut(true)}
+                    className="w-full bg-ink text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-dark transition-all disabled:opacity-50"
+                  >
+                    Finalizar Pedido
+                  </button>
+                </div>
+              </>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pr-2">
+                <button onClick={() => setIsCheckingOut(false)} className="text-sm text-gold-dark font-bold uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <ChevronRight className="rotate-180" size={16} /> Voltar ao Carrinho
+                </button>
+                <input required placeholder="Nome Completo" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} />
+                <input required type="email" placeholder="E-mail" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.customer_email} onChange={e => setFormData({...formData, customer_email: e.target.value})} />
+                <input required placeholder="Telefone" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.customer_phone} onChange={e => setFormData({...formData, customer_phone: e.target.value})} />
+                <input required placeholder="Endereço Completo" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                <div className="grid grid-cols-2 gap-4">
+                  <input required placeholder="Cidade" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                  <input required placeholder="Estado" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} />
+                </div>
+                <input required placeholder="CEP" className="w-full p-3 bg-white rounded-lg border-none outline-none focus:ring-2 focus:ring-gold-dark" value={formData.zip_code} onChange={e => setFormData({...formData, zip_code: e.target.value})} />
+                <button type="submit" className="w-full bg-gold-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-gold-light transition-all mt-4">
+                  Confirmar Pedido
+                </button>
+              </form>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const AdminDashboard = ({ onBack, onRefresh }: { onBack: () => void, onRefresh: () => void }) => {
+  const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'Cordões', price: 0, image: '', weight: '', description: '' });
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
+
+  const fetchData = async () => {
+    const pRes = await fetch('/api/products');
+    setProducts(await pRes.json());
+    const oRes = await fetch('/api/orders');
+    setOrders(await oRes.json());
+  };
+
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProduct)
+    });
+    setNewProduct({ name: '', category: 'Cordões', price: 0, image: '', weight: '', description: '' });
+    fetchData();
+    onRefresh();
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    await fetch(`/api/products/${id}`, { method: 'DELETE' });
+    fetchData();
+    onRefresh();
+  };
+
+  const handleUpdateOrderStatus = async (id: number, status: string) => {
+    await fetch(`/api/orders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    fetchData();
+  };
+
+  return (
+    <div className="min-h-screen bg-paper p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center gap-4">
+            <button onClick={onBack} className="p-2 hover:bg-ink/5 rounded-full transition-colors"><ArrowRight className="rotate-180" /></button>
+            <h2 className="text-4xl font-serif">Painel Administrativo</h2>
+          </div>
+          <div className="flex bg-white rounded-xl p-1 shadow-sm">
+            <button onClick={() => setActiveTab('products')} className={cn("px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-widest transition-all", activeTab === 'products' ? "bg-gold-dark text-white" : "text-ink/40")}>Produtos</button>
+            <button onClick={() => setActiveTab('orders')} className={cn("px-6 py-2 rounded-lg font-bold text-sm uppercase tracking-widest transition-all", activeTab === 'orders' ? "bg-gold-dark text-white" : "text-ink/40")}>Pedidos</button>
+          </div>
+        </div>
+
+        {activeTab === 'products' ? (
+          <div className="grid lg:grid-cols-3 gap-12">
+            <div className="lg:col-span-1">
+              <div className="bg-white p-8 rounded-3xl shadow-sm">
+                <h3 className="text-xl font-serif mb-6">Adicionar Produto</h3>
+                <form onSubmit={handleAddProduct} className="space-y-4">
+                  <input required placeholder="Nome" className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
+                  <select className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})}>
+                    {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                  <input required type="number" placeholder="Preço" className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
+                  <input required placeholder="Peso (ex: 10g)" className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.weight} onChange={e => setNewProduct({...newProduct, weight: e.target.value})} />
+                  <input required placeholder="URL da Imagem" className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.image} onChange={e => setNewProduct({...newProduct, image: e.target.value})} />
+                  <textarea placeholder="Descrição" className="w-full p-3 bg-paper rounded-lg outline-none" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} />
+                  <button type="submit" className="w-full bg-ink text-white py-3 rounded-lg font-bold uppercase tracking-widest hover:bg-gold-dark transition-all">Salvar Produto</button>
+                </form>
+              </div>
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              {products.map(p => (
+                <div key={p.id} className="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-4">
+                  <img src={p.image} className="w-16 h-16 object-cover rounded-lg" />
+                  <div className="flex-1">
+                    <h4 className="font-serif text-lg">{p.name}</h4>
+                    <p className="text-xs text-ink/40 uppercase tracking-widest">{p.category} • {p.weight} • {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.price)}</p>
+                  </div>
+                  <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 p-2 hover:bg-red-50 rounded-full transition-colors"><X size={20} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {orders.map(o => (
+              <div key={o.id} className="bg-white p-8 rounded-3xl shadow-sm">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h4 className="text-2xl font-serif mb-1">Pedido #{o.id}</h4>
+                    <p className="text-sm text-ink/40">{new Date(o.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <select 
+                    className={cn("px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest outline-none", 
+                      o.status === 'Pendente' ? "bg-yellow-100 text-yellow-700" : 
+                      o.status === 'Enviado' ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700")}
+                    value={o.status}
+                    onChange={(e) => handleUpdateOrderStatus(o.id, e.target.value)}
+                  >
+                    <option value="Pendente">Pendente</option>
+                    <option value="Enviado">Enviado</option>
+                    <option value="Entregue">Entregue</option>
+                    <option value="Cancelado">Cancelado</option>
+                  </select>
+                </div>
+                <div className="grid md:grid-cols-2 gap-12">
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-4">Cliente</h5>
+                    <p className="font-bold">{o.customer_name}</p>
+                    <p className="text-sm">{o.customer_email}</p>
+                    <p className="text-sm">{o.customer_phone}</p>
+                    <div className="mt-4 p-4 bg-paper rounded-xl text-sm">
+                      <p>{o.address}</p>
+                      <p>{o.city}, {o.state} - {o.zip_code}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-4">Itens</h5>
+                    <div className="space-y-2">
+                      {JSON.parse(o.items).map((item: any) => (
+                        <div key={item.id} className="flex justify-between text-sm">
+                          <span>{item.quantity}x {item.name}</span>
+                          <span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                      <div className="pt-4 border-t border-ink/5 flex justify-between font-bold text-lg">
+                        <span>Total</span>
+                        <span className="text-gold-dark">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(o.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {orders.length === 0 && <div className="text-center py-24 text-ink/40 italic">Nenhum pedido realizado ainda.</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // --- Components ---
 
-const Navbar = () => {
+const Navbar = ({ onAdminClick, cartCount, onCartClick }: { onAdminClick: () => void, cartCount: number, onCartClick: () => void }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -60,7 +351,15 @@ const Navbar = () => {
           <a href="#inicio" className="nav-link text-sm font-medium uppercase tracking-widest">Início</a>
           <a href="#categorias" className="nav-link text-sm font-medium uppercase tracking-widest">Categorias</a>
           <a href="#destaques" className="nav-link text-sm font-medium uppercase tracking-widest">Destaques</a>
-          <a href="#sobre" className="nav-link text-sm font-medium uppercase tracking-widest">Sobre</a>
+          <button onClick={onAdminClick} className="nav-link text-sm font-medium uppercase tracking-widest">Painel</button>
+          <button onClick={onCartClick} className="relative p-2 text-ink hover:text-gold-dark transition-colors">
+            <Gem size={24} />
+            {cartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-gold-dark text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                {cartCount}
+              </span>
+            )}
+          </button>
           <a href="#contato" className="bg-gold-dark text-white px-6 py-2 rounded-full text-sm font-bold uppercase tracking-widest hover:bg-gold-light transition-colors">Falar com Especialista</a>
         </div>
 
@@ -174,11 +473,12 @@ const CategoryCard = ({ category, index }: CategoryCardProps) => {
 };
 
 interface ProductCardProps {
-  product: typeof FEATURED_PRODUCTS[0];
+  product: Product;
+  onAddToCart: () => void;
   key?: React.Key;
 }
 
-const ProductCard = ({ product }: ProductCardProps) => {
+const ProductCard = ({ product, onAddToCart }: ProductCardProps) => {
   return (
     <div className="group">
       <div className="relative aspect-square overflow-hidden rounded-2xl mb-4 bg-white luxury-shadow">
@@ -188,16 +488,24 @@ const ProductCard = ({ product }: ProductCardProps) => {
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute top-4 right-4">
-          <button className="bg-white/90 backdrop-blur-sm p-2 rounded-full text-ink hover:text-gold-dark transition-colors">
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
+          <button className="bg-white/90 backdrop-blur-sm p-2 rounded-full text-ink hover:text-gold-dark transition-colors shadow-sm">
             <Star size={18} />
+          </button>
+          <button 
+            onClick={onAddToCart}
+            className="bg-gold-dark text-white p-2 rounded-full hover:bg-gold-light transition-colors shadow-md"
+          >
+            <Gem size={18} />
           </button>
         </div>
       </div>
-      <p className="text-gold-dark text-xs font-bold uppercase tracking-widest mb-1">{product.category}</p>
+      <p className="text-gold-dark text-xs font-bold uppercase tracking-widest mb-1">{product.category} • {product.weight}</p>
       <h4 className="text-xl font-serif mb-2">{product.name}</h4>
       <div className="flex items-center justify-between">
-        <span className="font-medium text-ink/60">{product.price}</span>
+        <span className="font-medium text-ink/60">
+          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+        </span>
         <button className="text-gold-dark font-bold text-sm uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
           Detalhes <ChevronRight size={14} />
         </button>
@@ -402,9 +710,49 @@ const Footer = () => {
 // --- Main App ---
 
 export default function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [view, setView] = useState<'store' | 'admin'>('store');
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+      setProducts(data);
+    } catch (err) {
+      console.error("Failed to fetch products", err);
+    }
+  };
+
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+    setIsCartOpen(true);
+  };
+
+  const removeFromCart = (id: number) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
+
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  if (view === 'admin') {
+    return <AdminDashboard onBack={() => setView('store')} onRefresh={fetchProducts} />;
+  }
+
   return (
     <div className="min-h-screen">
-      <Navbar />
+      <Navbar onAdminClick={() => setView('admin')} cartCount={cart.reduce((s, i) => s + i.quantity, 0)} onCartClick={() => setIsCartOpen(true)} />
       
       <main>
         <Hero />
@@ -437,9 +785,15 @@ export default function App() {
               </a>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
-              {FEATURED_PRODUCTS.map((prod) => (
-                <ProductCard key={prod.id} product={prod} />
-              ))}
+              {products.length > 0 ? (
+                products.map((prod) => (
+                  <ProductCard key={prod.id} product={prod} onAddToCart={() => addToCart(prod)} />
+                ))
+              ) : (
+                <div className="col-span-full text-center py-12 text-ink/40 italic">
+                  Nenhum produto cadastrado no catálogo.
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -450,6 +804,14 @@ export default function App() {
       </main>
 
       <Footer />
+
+      <CartDrawer 
+        isOpen={isCartOpen} 
+        onClose={() => setIsCartOpen(false)} 
+        items={cart} 
+        total={cartTotal}
+        onRemove={removeFromCart}
+      />
 
       {/* Floating WhatsApp Button */}
       <a 
